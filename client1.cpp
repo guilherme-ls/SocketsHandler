@@ -12,16 +12,14 @@ int main() {
     while (1) {
         SocketHandler::listenClient(&com);
 
-        std::cout << "Client listened: " << com.message << std::endl;
-
         if (com.send_to == "1") {
             std::cout << "Received from " << com.sent_from << ": " << com.message << std::endl;
 
-            //com.send_to = com.sent_from;
-            //com.sent_from = 1;
+            com.send_to = 2;
+            com.sent_from = 1;
 
-            //SocketHandler::sendMessage(com);
-            //std::cout << "Sent (" << com.message << ") to " << com.send_to << std::endl;
+            SocketHandler::sendMessage(com);
+            std::cout << "Sent (" << com.message << ") to " << com.send_to << std::endl;
             
             com = {"\0", "\0", "\0"};
         }

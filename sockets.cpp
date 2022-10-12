@@ -55,14 +55,14 @@ void SocketHandler::openSocket(std::string name) {
 
     // Sends socket information to main    
     write(connection_socket, name.c_str(), name.length());
-    printf("Identity message sent");
+    printf("Identity message sent\n");
 
     // Confirmation
     char buffer[5] = "null";
     while(strcmp(buffer, "rcvd") != 0) {
         read(connection_socket, buffer, 5);
     }
-    printf("Identity confirmed");
+    printf("Identity confirmed\n");
 }
 
 
@@ -89,11 +89,18 @@ void SocketHandler::listenClient(SocketHandler::Message* com) {
             perror("read");
             //exit(EXIT_FAILURE);
         }
-        buffer[temp] = '\0';
+        else if (temp == 0) {
+            close(connection_socket);
+            printf("Server died\n");
+            exit(EXIT_FAILURE);
+        }
+        else {
+            buffer[temp] = '\0';
 
-        // Returns message
-        *com = SocketHandler::strToMsg(buffer);
-        printf("Passou mensagem\n");
+            // Returns message
+            *com = SocketHandler::strToMsg(buffer);
+            printf("Passou mensagem\n");
+        }
     }
 }
 
@@ -123,42 +130,45 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
     // If main socket can be read, accepts new connections
     if (FD_ISSET(connection_socket, &fd_reads)) {
         int temp;
-        struct sockaddr_un name;
         // Accepts
-        if ((temp = accept(connection_socket, (struct sockaddr *) &name, (socklen_t *) sizeof(name))) == -1) {
+        if ((temp = accept(connection_socket, NULL, NULL)) == -1) {
             perror("accept");
             //exit(EXIT_FAILURE);
         }
         printf("Accepted new connection\n");
         
         // Gets connected socket's identity
-        FD_ZERO(&fd_reads);
-        FD_SET(temp, &fd_reads);
-        select(1, &fd_reads, NULL, NULL, NULL);
         char buffer[STD_SIZE];
         read(temp, buffer, STD_SIZE);
 
         for (int i = 0; i < size; i++) {
             if (strcmp(buffer, connection_list[i].c_str()) == 0) {
                 client_sockets[i] = temp;
+                printf("Stored new connection\n");  
             }
         }
 
-        write(temp, "rcvd", 5);
-        printf("Stored new connection\n");   
+        write(temp, "rcvd", 5); 
     }
 
     // Transfers messages between children
     for (int i = 0; i < size; i++) {
         if (FD_ISSET(client_sockets[i], &fd_reads)) {
+            int signal;
             char buffer[STD_SIZE];
-            if (read(client_sockets[i], buffer, STD_SIZE) == -1) {
+            if ((signal = read(client_sockets[i], buffer, STD_SIZE)) == -1) {
                 perror("read");
                 //exit(EXIT_FAILURE);
             }
-            SocketHandler::Message com = strToMsg(buffer);
-            transfer(com, client_sockets, size);
-            printf("Transfered message\n");
+            else if (signal == 0) {
+                close(client_sockets[i]);
+                client_sockets[i] = 0;
+            }
+            else {
+                SocketHandler::Message com = strToMsg(buffer);
+                transfer(com, client_sockets, size);
+                printf("Transfered message\n");
+            }
         }
     }
 }
@@ -172,7 +182,7 @@ void SocketHandler::sendMessage(SocketHandler::Message com) {
     }
 }
 
-void SocketHandler::transfer(SocketHandler::Message com, int* sockets, int size) {
+void SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
     if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) >= size) {
         perror("invalid destination");
         //exit(EXIT_FAILURE);
@@ -180,7 +190,7 @@ void SocketHandler::transfer(SocketHandler::Message com, int* sockets, int size)
 
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
 
-    if (write(sockets[std::stoi(com.send_to)], men.c_str(), men.length()) == -1) {
+    if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
         perror("message not sent");
         //exit(EXIT_FAILURE);
     }

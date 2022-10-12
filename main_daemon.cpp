@@ -13,7 +13,7 @@ int main() {
     std::cout << "Server initialized" << std::endl;
     
     // Listens and replies
-    for (int i = 0; i < 20; i++) {
+    while (1) {
         SocketHandler::listenServer(client_sockets, connection_list, connection_number);
         std::cout << "Server listened" << std::endl;
     }

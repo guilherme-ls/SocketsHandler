@@ -10,7 +10,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#define SOCKET_NAME "/tmp/10server.socket"
+#define SOCKET_NAME "/tmp/server.socket"
 #define STD_SIZE 128
 
 class SocketHandler {
