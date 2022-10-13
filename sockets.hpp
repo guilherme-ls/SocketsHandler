@@ -38,7 +38,7 @@ class SocketHandler {
 
         static void listenClient(SocketHandler::Message* com);
 
-        static void listenServer(int* sockets, std::string* connection_list, int size);
+        static void listenServer(int* sockets, std::string* connection_list, int size, SocketHandler::Message* server_com);
 
         static void sendMessage(Message com);
 

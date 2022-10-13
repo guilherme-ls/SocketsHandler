@@ -103,7 +103,7 @@ void SocketHandler::listenClient(SocketHandler::Message* com) {
     }
 }
 
-void SocketHandler::listenServer(int* client_sockets, std::string* connection_list, int size) {
+void SocketHandler::listenServer(int* client_sockets, std::string* connection_list, int size, SocketHandler::Message* server_com) {
     // Puts all sockets on list
     int max_fd = connection_socket;
     fd_set fd_reads;
@@ -159,15 +159,27 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
                 perror("read");
                 //exit(EXIT_FAILURE);
             }
+            // Socket closing signal
             else if (signal == 0) {
                 close(client_sockets[i]);
                 client_sockets[i] = 0;
             }
+            // Transfers message or receives it
             else {
                 buffer[signal] = '\0';
                 SocketHandler::Message com = strToMsg(buffer);
-                transfer(com, client_sockets, size);
-                printf("Transfered message\n");
+
+                if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) > size) {
+                    printf("invalid destination");
+                    //exit(EXIT_FAILURE);
+                }
+                else if (std::stoi(com.send_to) == 0) {
+                    *server_com = com;
+                }
+                else {
+                    transfer(com, client_sockets, size);
+                    printf("Transfered message\n");
+                }                
             }
         }
     }
@@ -183,11 +195,6 @@ void SocketHandler::sendMessage(SocketHandler::Message com) {
 }
 
 void SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
-    if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) > size) {
-        perror("invalid destination");
-        //exit(EXIT_FAILURE);
-    }
-
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
     if (std::stoi(com.send_to) > 0) {
         if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
