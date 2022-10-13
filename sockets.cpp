@@ -99,7 +99,6 @@ void SocketHandler::listenClient(SocketHandler::Message* com) {
 
             // Returns message
             *com = SocketHandler::strToMsg(buffer);
-            printf("Passou mensagem\n");
         }
     }
 }
@@ -165,6 +164,7 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
                 client_sockets[i] = 0;
             }
             else {
+                buffer[signal] = '\0';
                 SocketHandler::Message com = strToMsg(buffer);
                 transfer(com, client_sockets, size);
                 printf("Transfered message\n");
@@ -183,17 +183,19 @@ void SocketHandler::sendMessage(SocketHandler::Message com) {
 }
 
 void SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
-    if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) >= size) {
+    if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) > size) {
         perror("invalid destination");
         //exit(EXIT_FAILURE);
     }
 
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
-
-    if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
-        perror("message not sent");
-        //exit(EXIT_FAILURE);
+    if (std::stoi(com.send_to) > 0) {
+        if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
+            perror("message not sent");
+            //exit(EXIT_FAILURE);
+        }
     }
+    
 }
 
 SocketHandler::Message SocketHandler::strToMsg(char* com) {

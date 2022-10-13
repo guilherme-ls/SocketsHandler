@@ -2,9 +2,9 @@
 #include <iostream>
 
 int main() {
-    const int connection_number = 2;
+    const int connection_number = 3;
 
-    std::string connection_list[connection_number] = {"client1", "client2"};
+    std::string connection_list[connection_number] = {"client1", "client2", "client3"};
 
     int* client_sockets = (int*)calloc(connection_number, sizeof(int));
 
