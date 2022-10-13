@@ -3,7 +3,8 @@
 int SocketHandler::connection_socket;
 
 // Starts main daemon's socket
-void SocketHandler::start() {
+// return value: -1 = failed; 0 = succeded
+int SocketHandler::start() {
     unlink(SOCKET_NAME);
 
     struct sockaddr_un address;
@@ -13,7 +14,7 @@ void SocketHandler::start() {
     connection_socket = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (connection_socket == -1) {
         perror("socket");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
 
     // Binds socket to defined address
@@ -21,17 +22,21 @@ void SocketHandler::start() {
     strncpy(address.sun_path, SOCKET_NAME, sizeof(address.sun_path) - 1);
     if (bind(connection_socket, (const struct sockaddr *) &address, sizeof(address)) == -1) {
         perror("bind");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
 
     // Prepares for accepting connections
     if (listen(connection_socket, 20) == -1) {
         perror("listen");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
+
+    return 0;
 }
 
-void SocketHandler::openSocket(std::string name) {
+// Starts client sockets
+// return value: -1 = failed; 0 = succeded
+int SocketHandler::openSocket(std::string name) {
     struct sockaddr_un address;
     memset(&address, 0, sizeof(address));
 
@@ -39,9 +44,8 @@ void SocketHandler::openSocket(std::string name) {
     connection_socket = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (connection_socket == -1) {
         perror("socket");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
-    printf("local socket created\n");
 
     // Connects to main_daemon's socket adress
     address.sun_family = AF_UNIX;
@@ -49,24 +53,23 @@ void SocketHandler::openSocket(std::string name) {
 
     if (connect(connection_socket, (const struct sockaddr *) &address, sizeof(address)) == -1) {
         perror("The server is down");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
-    printf("socket connected to main\n");
 
     // Sends socket information to main    
     write(connection_socket, name.c_str(), name.length());
-    printf("Identity message sent\n");
 
     // Confirmation
     char buffer[5] = "null";
     while(strcmp(buffer, "rcvd") != 0) {
         read(connection_socket, buffer, 5);
     }
-    printf("Identity confirmed\n");
+    return 0;
 }
 
-
-void SocketHandler::listenClient(SocketHandler::Message* com) {
+// Client main listening function
+// return value: 1 = success; 0 = server down; -1 = local socket failure
+int SocketHandler::listenClient(SocketHandler::Message* com) {
     // Puts all sockets on list
     fd_set fd_reads;
     FD_ZERO(&fd_reads);
@@ -77,7 +80,7 @@ void SocketHandler::listenClient(SocketHandler::Message* com) {
     ssize_t activity = select(connection_socket + 1, &fd_reads, NULL, NULL, &time);       
     if ((activity < 0) && (errno!=EINTR)) {  
         printf("select error");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
 
     // Reads message, if present
@@ -87,12 +90,11 @@ void SocketHandler::listenClient(SocketHandler::Message* com) {
 
         if((temp = read(connection_socket, buffer, STD_SIZE)) == -1) {
             perror("read");
-            //exit(EXIT_FAILURE);
+            return -1;
         }
         else if (temp == 0) {
             close(connection_socket);
-            printf("Server died\n");
-            exit(EXIT_FAILURE);
+            return 0;
         }
         else {
             buffer[temp] = '\0';
@@ -101,9 +103,14 @@ void SocketHandler::listenClient(SocketHandler::Message* com) {
             *com = SocketHandler::strToMsg(buffer);
         }
     }
+
+    return 1;
 }
 
+// Server listening function
+// still needs to implement an error system
 void SocketHandler::listenServer(int* client_sockets, std::string* connection_list, int size, SocketHandler::Message* server_com) {
+    // int ret_val = 1;
     // Puts all sockets on list
     int max_fd = connection_socket;
     fd_set fd_reads;
@@ -123,7 +130,7 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
     ssize_t activity = select(max_fd + 1, &fd_reads, NULL, NULL, &time);       
     if ((activity < 0) && (errno!=EINTR)) {
         printf("select error");
-        //exit(EXIT_FAILURE);
+        // return -1;
     }
 
     // If main socket can be read, accepts new connections
@@ -132,9 +139,8 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
         // Accepts
         if ((temp = accept(connection_socket, NULL, NULL)) == -1) {
             perror("accept");
-            //exit(EXIT_FAILURE);
+            // return = -1;
         }
-        printf("Accepted new connection\n");
         
         // Gets connected socket's identity
         char buffer[STD_SIZE];
@@ -157,12 +163,13 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
             char buffer[STD_SIZE];
             if ((signal = read(client_sockets[i], buffer, STD_SIZE)) == -1) {
                 perror("read");
-                //exit(EXIT_FAILURE);
+                // return = -1;
             }
             // Socket closing signal
             else if (signal == 0) {
                 close(client_sockets[i]);
                 client_sockets[i] = 0;
+                // Can include code to inform main of the event
             }
             // Transfers message or receives it
             else {
@@ -171,40 +178,48 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
 
                 if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) > size) {
                     printf("invalid destination");
-                    //exit(EXIT_FAILURE);
+                    // return = -1;
                 }
                 else if (std::stoi(com.send_to) == 0) {
                     *server_com = com;
+                    // return 0;
                 }
                 else {
                     transfer(com, client_sockets, size);
                     printf("Transfered message\n");
+                    // return 1;
                 }                
             }
         }
     }
+    // return 1;
 }
 
-void SocketHandler::sendMessage(SocketHandler::Message com) {
+//Send message from client to server
+// return value: -1 = failed; 0 = succeded
+int SocketHandler::sendMessage(SocketHandler::Message com) {
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
 
     if (write(connection_socket, men.c_str(), men.length()) == -1) {
         perror("message not sent");
-        //exit(EXIT_FAILURE);
+        return -1;
     }
+    return 0;
 }
 
-void SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
+// Transfers messages between clients
+// return value: -1 = failed; 0 = succeded
+int SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
-    if (std::stoi(com.send_to) > 0) {
-        if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
-            perror("message not sent");
-            //exit(EXIT_FAILURE);
-        }
+
+    if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
+        perror("message not sent");
+        return -1;
     }
-    
+    return 0;
 }
 
+// Converts string to Message struct
 SocketHandler::Message SocketHandler::strToMsg(char* com) {
     std::string cut[3];
     int i = 0, j = 0;
@@ -221,15 +236,6 @@ SocketHandler::Message SocketHandler::strToMsg(char* com) {
     SocketHandler::Message mes {cut[0], cut[1], cut[2]};
 
     return mes;
-}
-
-int SocketHandler::getId(std::string name, std::string* name_list, int size) {
-    for (int i = 0; i < size; i++) {
-        if (name == name_list[i]) {
-            return i;
-        }
-    }
-    return -1;
 }
 
 void SocketHandler::closeSocket(int dis_socket) {

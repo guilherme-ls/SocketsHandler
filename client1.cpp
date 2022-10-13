@@ -16,7 +16,10 @@ int main() {
     com = {"\0", "\0", "\0"};
     
     while (1) {
-        SocketHandler::listenClient(&com);
+        if (SocketHandler::listenClient(&com) == 0){
+            printf("Server died\n");
+            return -1;
+        }
 
         if (com.send_to != "\0") {
             std::cout << "Received from " << com.sent_from << ": " << com.message << std::endl;
@@ -30,6 +33,4 @@ int main() {
             com = {"\0", "\0", "\0"};
         }
     }
-    
-    // SocketHandler::closeSocket(SocketHandler::connection_socket);
 }

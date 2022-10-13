@@ -32,21 +32,19 @@ class SocketHandler {
         static int connection_socket;
 
     public:
-        static void start();
+        static int start();
 
-        static void openSocket(std::string name);
+        static int openSocket(std::string name);
 
-        static void listenClient(SocketHandler::Message* com);
+        static int listenClient(SocketHandler::Message* com);
 
         static void listenServer(int* sockets, std::string* connection_list, int size, SocketHandler::Message* server_com);
 
-        static void sendMessage(Message com);
+        static int sendMessage(Message com);
 
-        static void transfer(Message com, int* sockets, int size);
+        static int transfer(Message com, int* sockets, int size);
 
         static Message strToMsg(char* com);
-
-        static int getId(std::string name, std::string* name_list, int size);
 
         static void closeSocket(int dis_socket);
 };
