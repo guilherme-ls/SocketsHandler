@@ -2,8 +2,9 @@
 
 int SocketHandler::connection_socket;
 
-// Starts main daemon's socket
-// return value: -1 = failed; 0 = succeded
+/** Starts main daemon's socket
+ * @return 0 on succes, -1 on failure 
+ */
 int SocketHandler::start() {
     unlink(SOCKET_NAME);
 
@@ -34,8 +35,10 @@ int SocketHandler::start() {
     return 0;
 }
 
-// Starts client sockets
-// return value: -1 = failed; 0 = succeded
+/** Starts client sockets
+ * @param name client's name
+ * @return 0 on success, -1 on failure
+ */
 int SocketHandler::openSocket(std::string name) {
     struct sockaddr_un address;
     memset(&address, 0, sizeof(address));
@@ -67,8 +70,10 @@ int SocketHandler::openSocket(std::string name) {
     return 0;
 }
 
-// Client main listening function
-// return value: 1 = success; 0 = server down; -1 = local socket failure
+/** Client main listening function
+ * @param com Message pointer to receive the incoming message
+ * @return 1 on success, 0 if server is down, -1 on local failure 
+ */
 int SocketHandler::listenClient(SocketHandler::Message* com) {
     // Puts all sockets on list
     fd_set fd_reads;
@@ -107,8 +112,12 @@ int SocketHandler::listenClient(SocketHandler::Message* com) {
     return 1;
 }
 
-// Server listening function
-// still needs to implement an error system
+/** Server listening function
+ * @param client_sockets int array with all connected sockets
+ * @param connection_list string array with all socket names
+ * @param size size of the given arrays
+ * @param server_com Message pointer to receive incoming server messages
+ */
 void SocketHandler::listenServer(int* client_sockets, std::string* connection_list, int size, SocketHandler::Message* server_com) {
     // int ret_val = 1;
     // Puts all sockets on list
@@ -195,8 +204,10 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
     // return 1;
 }
 
-//Send message from client to server
-// return value: -1 = failed; 0 = succeded
+/** Send message from client to server
+ * @param com Message to be sent
+ * @return 0 on success, -1 on failure 
+ */
 int SocketHandler::sendMessage(SocketHandler::Message com) {
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
 
@@ -207,8 +218,13 @@ int SocketHandler::sendMessage(SocketHandler::Message com) {
     return 0;
 }
 
-// Transfers messages between clients
-// return value: -1 = failed; 0 = succeded
+/** Transfers messages between clients
+ * @param com Message to be transferes
+ * @param client_sockets int array with al connected sockets
+ * @param size size of the client array
+ * @return 0 on success, -1 on failure
+ */
+// implement error if client adress is 0
 int SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
 
@@ -219,7 +235,10 @@ int SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int
     return 0;
 }
 
-// Converts string to Message struct
+/** Converts strings to Message format
+ * @param com string to be converted
+ * @return returns Message recovered from string
+ */
 SocketHandler::Message SocketHandler::strToMsg(char* com) {
     std::string cut[3];
     int i = 0, j = 0;
@@ -238,102 +257,12 @@ SocketHandler::Message SocketHandler::strToMsg(char* com) {
     return mes;
 }
 
+/** Closes local socket and unlinks its name
+ * @param dis_socket socket to be disconnected
+ */
 void SocketHandler::closeSocket(int dis_socket) {
     struct sockaddr_un name;
     getpeername(dis_socket, (struct sockaddr *) &name, (socklen_t *) sizeof(name));
     close(dis_socket);
     unlink(name.sun_path);
 }
-
-
-
-
-
-/*
-int NO(int argc, char *argv[]) {
-    struct sockaddr_un name;
-    int down_flag = 0;
-    int connection_socket;
-    int data_socket;
-    char buffer[STD_SIZE];
-
-    // Create local socket
-    connection_socket = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (connection_socket == -1) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
-    memset(&name, 0, sizeof(name));
-
-    // Bind socket to socket name
-    name.sun_family = AF_UNIX;
-    strncpy(name.sun_path, SOCKET_NAME, sizeof(name.sun_path) - 1);
-    if (bind(connection_socket, (const struct sockaddr *) &name, sizeof(name)) == -1) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
-
-    // Prepare for accepting connections
-    if (listen(connection_socket, 20) == -1) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-        
-    while (1) {
-        // Wait for incoming connection
-        data_socket = accept(connection_socket, NULL, NULL);
-        if (data_socket == -1) {
-            perror("accept");
-            exit(EXIT_FAILURE);
-        }
-
-        while (1) {
-            // Wait for next data packet
-            if (read(data_socket, buffer, sizeof(buffer)) == -1) {
-                perror("read");
-                exit(EXIT_FAILURE);
-            }
-
-            // Ensure buffer is 0-terminated
-            buffer[sizeof(buffer) - 1] = 0;
-
-            // Stops reading when receives END signal
-            if (!strncmp(buffer, "END", sizeof(buffer))) {
-                break;
-            }
-
-            // Kills server when receives DOWN signal
-            if (!strncmp(buffer, "DOWN", sizeof(buffer))) {
-                down_flag = 1;
-                break;
-            }
-
-            printf("received = %s\n", buffer);
-
-            // Send result back
-            if (write(data_socket, buffer, sizeof(buffer)) == -1) {
-                perror("write");
-                exit(EXIT_FAILURE);
-            }
-
-            printf("sent = %s\n", buffer);
-        }        
-
-        // Close socket
-        close(data_socket);
-
-        // Quit on DOWN command
-        if (down_flag) {
-            printf("Server closed\n");
-            break;
-        }
-    }
-
-    close(connection_socket);
-
-    // Unlink the socket
-    unlink(SOCKET_NAME);
-    exit(EXIT_SUCCESS);
-
-}
-*/
