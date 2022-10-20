@@ -72,17 +72,17 @@ int SocketHandler::openSocket(std::string name) {
 
 /** Client main listening function
  * @param com Message pointer to receive the incoming message
+ * @param dropout_time struct in {seconds, milisseconds} that defines time until dropping the listening function, when no messages are received
  * @return 1 on success, 0 if server is down, -1 on local failure 
  */
-int SocketHandler::listenClient(SocketHandler::Message* com) {
+int SocketHandler::listenClient(SocketHandler::Message* com, struct timeval dropout_time) {
     // Puts all sockets on list
     fd_set fd_reads;
     FD_ZERO(&fd_reads);
     FD_SET(connection_socket, &fd_reads);
     
-    struct timeval time = {1,0};
     // Checks wich sockets can be read
-    ssize_t activity = select(connection_socket + 1, &fd_reads, NULL, NULL, &time);       
+    ssize_t activity = select(connection_socket + 1, &fd_reads, NULL, NULL, &dropout_time);   
     if ((activity < 0) && (errno!=EINTR)) {  
         printf("select error");
         return -1;
@@ -95,6 +95,7 @@ int SocketHandler::listenClient(SocketHandler::Message* com) {
 
         if((temp = read(connection_socket, buffer, STD_SIZE)) == -1) {
             perror("read");
+            write(connection_socket, "-1", 3);
             return -1;
         }
         else if (temp == 0) {
@@ -105,6 +106,7 @@ int SocketHandler::listenClient(SocketHandler::Message* com) {
             buffer[temp] = '\0';
 
             // Returns message
+            write(connection_socket, "1", 2);
             *com = SocketHandler::strToMsg(buffer);
         }
     }
@@ -117,9 +119,9 @@ int SocketHandler::listenClient(SocketHandler::Message* com) {
  * @param connection_list string array with all socket names
  * @param size size of the given arrays
  * @param server_com Message pointer to receive incoming server messages
+ * @return 1 on success, 0 on receiving server message, -1 on critical failure
  */
-void SocketHandler::listenServer(int* client_sockets, std::string* connection_list, int size, SocketHandler::Message* server_com) {
-    // int ret_val = 1;
+int SocketHandler::listenServer(int* client_sockets, std::string* connection_list, int size, SocketHandler::Message* server_com, struct timeval dropout_time) {
     // Puts all sockets on list
     int max_fd = connection_socket;
     fd_set fd_reads;
@@ -139,7 +141,7 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
     ssize_t activity = select(max_fd + 1, &fd_reads, NULL, NULL, &time);       
     if ((activity < 0) && (errno!=EINTR)) {
         printf("select error");
-        // return -1;
+        return -1;
     }
 
     // If main socket can be read, accepts new connections
@@ -148,7 +150,6 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
         // Accepts
         if ((temp = accept(connection_socket, NULL, NULL)) == -1) {
             perror("accept");
-            // return = -1;
         }
         
         // Gets connected socket's identity
@@ -172,7 +173,6 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
             char buffer[STD_SIZE];
             if ((signal = read(client_sockets[i], buffer, STD_SIZE)) == -1) {
                 perror("read");
-                // return = -1;
             }
             // Socket closing signal
             else if (signal == 0) {
@@ -186,53 +186,78 @@ void SocketHandler::listenServer(int* client_sockets, std::string* connection_li
                 SocketHandler::Message com = strToMsg(buffer);
 
                 if (std::stoi(com.send_to) < 0 || std::stoi(com.send_to) > size) {
-                    printf("invalid destination");
-                    // return = -1;
+                    write(client_sockets[std::stoi(com.sent_from)-1], "-1", 3);
                 }
                 else if (std::stoi(com.send_to) == 0) {
                     *server_com = com;
-                    // return 0;
+                    write(client_sockets[std::stoi(com.sent_from)-1], "1", 2);
+                    return 0;
                 }
                 else {
-                    transfer(com, client_sockets, size);
-                    printf("Transfered message\n");
-                    // return 1;
+                    int temp;
+                    temp = transfer(com, client_sockets, size);
+                    char msg[3];
+                    sprintf(msg, "%d", temp);
+                    write(client_sockets[std::stoi(com.sent_from)-1], msg, 3);
                 }                
             }
         }
     }
-    // return 1;
+    return 1;
 }
 
 /** Send message from client to server
+ * @param socket socket to be sent the message
  * @param com Message to be sent
- * @return 0 on success, -1 on failure 
+ * @return 1 on success, 0 if destination does not exist, -1 on failure 
  */
-int SocketHandler::sendMessage(SocketHandler::Message com) {
+int SocketHandler::sendMessage(int socket, SocketHandler::Message com) {
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
 
-    if (write(connection_socket, men.c_str(), men.length()) == -1) {
+    if (write(socket, men.c_str(), men.length()) == -1) {
         perror("message not sent");
         return -1;
     }
-    return 0;
+
+    char buffer[3];
+    read(socket, buffer, 3);
+    buffer[2] = '\0';
+
+    if (atoi(buffer) == -1) {
+        printf("message not sent\n");
+    }
+    else if (atoi(buffer) == 0) {
+        printf("destination unavailable\n");
+    }
+
+    return atoi(buffer);
 }
 
 /** Transfers messages between clients
  * @param com Message to be transferes
  * @param client_sockets int array with al connected sockets
  * @param size size of the client array
- * @return 0 on success, -1 on failure
+ * @return 1 on success, 0 if destination cannot be found, -1 on failure
  */
 // implement error if client adress is 0
 int SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int size) {
     std::string men = com.send_to + "," + com.sent_from + "," + com.message;
 
+    if (client_sockets[std::stoi(com.send_to)-1] == 0) {
+        return 0;
+    }
+
     if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
         perror("message not sent");
         return -1;
     }
-    return 0;
+    else {
+        char buffer[3];
+        read(client_sockets[std::stoi(com.send_to)-1], buffer, 3);
+        return atoi(buffer);
+    }
+    
+    return 1;
 }
 
 /** Converts strings to Message format

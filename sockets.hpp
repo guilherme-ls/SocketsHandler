@@ -36,11 +36,11 @@ class SocketHandler {
 
         static int openSocket(std::string name);
 
-        static int listenClient(SocketHandler::Message* com);
+        static int listenClient(SocketHandler::Message* com, struct timeval dropout_time);
 
-        static void listenServer(int* sockets, std::string* connection_list, int size, SocketHandler::Message* server_com);
+        static int listenServer(int* sockets, std::string* connection_list, int size, SocketHandler::Message* server_com, struct timeval dropout_time);
 
-        static int sendMessage(Message com);
+        static int sendMessage(int socket, Message com);
 
         static int transfer(Message com, int* sockets, int size);
 

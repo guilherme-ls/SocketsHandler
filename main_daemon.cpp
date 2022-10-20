@@ -16,7 +16,7 @@ int main() {
     
     // Listens and replies
     while (1) {
-        SocketHandler::listenServer(client_sockets, connection_list, connection_number, &server_com);
+        SocketHandler::listenServer(client_sockets, connection_list, connection_number, &server_com, (timeval){1,0});
         std::cout << "Server listened" << std::endl;
 
         if (server_com.message != "\0") {

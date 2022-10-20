@@ -10,7 +10,7 @@ int main() {
     SocketHandler::Message com {"\0", "\0", "\0"};
 
     while (1) {
-        if (SocketHandler::listenClient(&com) == 0){
+        if (SocketHandler::listenClient(&com, (timeval){1,0}) == 0){
             printf("Server died\n");
             return -1;
         }
@@ -21,7 +21,7 @@ int main() {
             com.send_to = "1";
             com.sent_from = "3";
 
-            SocketHandler::sendMessage(com);
+            SocketHandler::sendMessage(SocketHandler::connection_socket, com);
             std::cout << "Sent (" << com.message << ") to " << com.send_to << std::endl;
             
             com = {"\0", "\0", "\0"};
