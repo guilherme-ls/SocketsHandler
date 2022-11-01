@@ -22,10 +22,10 @@ class SocketHandler {
 
             Message() = default;
 
-            Message(std::string send, std::string sent, std::string mess)
+            Message(std::string send, std::string sent, std::string msg)
                 : send_to { std::move(send) }
                 , sent_from { std::move(sent) }
-                , message { std::move(mess) }
+                , message { std::move(msg) }
                 {};
         };
 
@@ -42,9 +42,11 @@ class SocketHandler {
 
         static int sendMessage(int socket, Message com);
 
+        void closeSocket(int dis_socket);
+
+    private:
+        
         static int transfer(Message com, int* sockets, int size);
 
-        static Message strToMsg(char* com);
-
-        static void closeSocket(int dis_socket);
+        Message strToMsg(char* com);
 };

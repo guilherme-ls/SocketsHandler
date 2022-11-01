@@ -106,7 +106,6 @@ int SocketHandler::listenClient(SocketHandler::Message* com, struct timeval drop
             buffer[temp] = '\0';
 
             // Returns message
-            write(connection_socket, "1", 2);
             *com = SocketHandler::strToMsg(buffer);
         }
     }
@@ -246,17 +245,11 @@ int SocketHandler::transfer(SocketHandler::Message com, int* client_sockets, int
     if (client_sockets[std::stoi(com.send_to)-1] == 0) {
         return 0;
     }
-
     if (write(client_sockets[std::stoi(com.send_to)-1], men.c_str(), men.length()) == -1) {
         perror("message not sent");
         return -1;
     }
-    else {
-        char buffer[3];
-        read(client_sockets[std::stoi(com.send_to)-1], buffer, 3);
-        return atoi(buffer);
-    }
-    
+
     return 1;
 }
 
